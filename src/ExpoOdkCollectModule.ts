@@ -1,12 +1,18 @@
 import { NativeModule, requireNativeModule } from 'expo';
+import { OdkModuleEvents, OdkFormInstance } from './ExpoOdkCollect.types';
 
-import { ExpoOdkCollectModuleEvents } from './ExpoOdkCollect.types';
-
-declare class ExpoOdkCollectModule extends NativeModule<ExpoOdkCollectModuleEvents> {
-  PI: number;
-  hello(): string;
-  setValueAsync(value: string): Promise<void>;
+declare class OdkCollectModule extends NativeModule<OdkModuleEvents> {
+  returnResult(data: Record<string, unknown>): void;
+  getForms(): OdkFormInstance[];
+  openOdkForms(): void;
+  startODKCollect(): void;
+  startInstanceUploaderList(): void;
+  getCurrentODKid(): string;
+  checkIfopenByODKform(): string;
+  getIntentExtra(key: string): string;
+  getIntentExtras(): Record<string, unknown>;
+  editODKInstance(instanceId: string): void;
+  sendODKInstance(instanceId: string, serverUrl: string): void;
 }
 
-// This call loads the native module object from the JSI.
-export default requireNativeModule<ExpoOdkCollectModule>('ExpoOdkCollect');
+export default requireNativeModule<OdkCollectModule>('OdkCollect');

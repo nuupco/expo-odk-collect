@@ -1,9 +1,6 @@
 {
-  "platforms": ["apple", "android", "web"],
-  "apple": {
-    "modules": ["ExpoOdkCollectModule"]
-  },
+  "platforms": ["android"],
   "android": {
-    "modules": ["expo.modules.odkcollect.ExpoOdkCollectModule"]
+    "modules": ["expo.modules.odkcollect.OdkCollectModule"]
   }
 }

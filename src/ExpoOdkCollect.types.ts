@@ -1,19 +1,43 @@
-import type { StyleProp, ViewStyle } from 'react-native';
+export type OdkErrorCode =
+  | 'ODK_NOT_INSTALLED'
+  | 'ACTIVITY_NOT_AVAILABLE'
+  | 'FORMS_QUERY_FAILED';
 
-export type OnLoadEventPayload = {
-  url: string;
+export type OdkErrorPayload = {
+  code: OdkErrorCode;
+  message: string;
+  details?: string;
 };
 
-export type ExpoOdkCollectModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
+export type OdkFormInstance = {
+  _id: string;
+  displayName: string;
+  jrFormId: string;
+  jrVersion: string;
+  status: string;
+  date: string;
+  deletedDate: string;
+};
+
+export type OdkCollectConfig = {
+  odkPackageId?: string;
+  serverUrl?: string;
+  messages?: {
+    odkNotFound?: string;
+    genericError?: string;
+    odkAccessError?: string;
+  };
+};
+
+export type ReturnResultOptions<TData extends Record<string, unknown> = Record<string, unknown>> = {
+  onBeforeReturn?: (data: TData) => Promise<void>;
 };
 
 export type ChangeEventPayload = {
   value: string;
 };
 
-export type ExpoOdkCollectViewProps = {
-  url: string;
-  onLoad: (event: { nativeEvent: OnLoadEventPayload }) => void;
-  style?: StyleProp<ViewStyle>;
+export type OdkModuleEvents = {
+  onChange: (params: ChangeEventPayload) => void;
+  onError: (params: OdkErrorPayload) => void;
 };
