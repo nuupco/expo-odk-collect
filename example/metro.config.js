@@ -9,19 +9,23 @@ const config = getDefaultConfig(__dirname);
 // expo-odk-collect correctamente desde el monorepo local.
 config.watchFolders = [...(config.watchFolders || []), packageRoot];
 
-// Bloquear los node_modules del paquete padre para evitar conflictos
-// con versiones duplicadas de react / react-native.
-const blockListPatterns = [
-  // via symlink (node_modules/expo-odk-collect/node_modules)
-  new RegExp(
-    path.resolve(__dirname, 'node_modules/expo-odk-collect/node_modules').replace(/[/\\]/g, '[/\\\\]')
-  ),
-  // via ruta real (../node_modules)
-  new RegExp(
-    path.resolve(packageRoot, 'node_modules').replace(/[/\\]/g, '[/\\\\]')
-  ),
+// Cuando Metro resuelve imports desde ../src/ (el paquete en desarrollo),
+// necesita encontrar 'expo', 'react', etc. en los node_modules del example.
+// nodeModulesPaths le indica dónde buscar en orden.
+config.resolver.nodeModulesPaths = [
+  path.resolve(__dirname, 'node_modules'),
 ];
 
-config.resolver.blockList = blockListPatterns;
+// Bloquear SOLO react y react-native del paquete raíz para evitar
+// versiones duplicadas. NO bloqueamos expo ni otras peerDeps porque
+// ../src/ las necesita resolver desde example/node_modules.
+config.resolver.blockList = [
+  new RegExp(
+    path.resolve(packageRoot, 'node_modules', 'react') + path.sep
+  ),
+  new RegExp(
+    path.resolve(packageRoot, 'node_modules', 'react-native') + path.sep
+  ),
+];
 
 module.exports = config;
