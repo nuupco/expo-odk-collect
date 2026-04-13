@@ -119,7 +119,7 @@ export function FormsScreen() {
         <FlatList
           data={forms}
           keyExtractor={(item) => item.id}
-          scrollEnabled={false}
+          scrollEnabled={true}
           renderItem={({ item }) => (
             <View style={styles.card}>
               <Text style={styles.cardTitle}>{item.displayName}</Text>
@@ -151,7 +151,7 @@ export function FormsScreen() {
       <FlatList
         data={instances}
         keyExtractor={(item) => item.id}
-        scrollEnabled={false}
+        scrollEnabled={true}
         renderItem={({ item }) => (
           <View style={styles.card}>
             {/* Nombre legible de la instancia */}
