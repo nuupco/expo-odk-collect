@@ -4,6 +4,8 @@ Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intr
 
 > **Platform support**: Android only.
 
+> **Navigation support (current)**: at the moment, integration is documented and supported only with React Navigation.
+
 ---
 
 ## Table of Contents
