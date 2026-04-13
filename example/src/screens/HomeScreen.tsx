@@ -1,5 +1,5 @@
 /**
- * index.tsx — Pantalla principal del ejemplo
+ * HomeScreen.tsx — Pantalla principal del ejemplo
  *
  * Esta pantalla sirve como punto de entrada para explorar todas las funciones
  * del módulo expo-odk-collect de forma interactiva.
@@ -24,12 +24,14 @@
 
 import { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Button, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { RootStackParamList } from '../../App';
 import { useOdk } from 'expo-odk-collect';
 import type { OdkActivityResult } from 'expo-odk-collect';
 
-export default function HomeScreen() {
-  const router = useRouter();
+export function HomeScreen() {
+  const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, 'Home'>>();
   const { odk, result, error } = useOdk();
 
   // Estado de instalación de ODK Collect
@@ -53,7 +55,7 @@ export default function HomeScreen() {
 
   /**
    * Muestra errores del módulo en un Alert.
-   * El hook useOdk() también captura onError — el _layout.tsx maneja los globales,
+   * El hook useOdk() también captura onError — el App.tsx maneja los globales,
    * pero podés escuchar desde cualquier pantalla si necesitás reaccionar localmente.
    */
   useEffect(() => {
@@ -139,11 +141,11 @@ export default function HomeScreen() {
 
       <Button
         title="→ Pantalla: Lista de Formularios"
-        onPress={() => router.push('/forms')}
+        onPress={() => navigation.navigate('Forms')}
       />
       <Button
         title="→ Pantalla: Modo App Externa (flujo completo)"
-        onPress={() => router.push('/external-app')}
+        onPress={() => navigation.navigate('ExternalApp', {})}
       />
     </ScrollView>
   );

@@ -1,5 +1,5 @@
 /**
- * external-app.tsx — Pantalla de modo "app externa" de ODK Collect
+ * ExternalAppScreen.tsx — Pantalla de modo "app externa" de ODK Collect
  *
  * Esta pantalla demuestra el flujo completo de una "external app" de ODK Collect:
  *
@@ -50,7 +50,7 @@ const MOCK_SELECTION: SelectedData = {
   id_parcela: '42',
 };
 
-export default function ExternalAppScreen() {
+export function ExternalAppScreen() {
   const { odk } = useOdk();
 
   /**

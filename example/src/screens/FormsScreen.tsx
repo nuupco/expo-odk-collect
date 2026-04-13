@@ -1,5 +1,5 @@
 /**
- * forms.tsx — Pantalla de lista de formularios e instancias ODK
+ * FormsScreen.tsx — Pantalla de lista de formularios e instancias ODK
  *
  * Demuestra cómo obtener, listar y gestionar formularios e instancias
  * almacenadas en ODK Collect usando el módulo expo-odk-collect.
@@ -29,7 +29,7 @@ import { useState } from 'react';
 import { useOdk } from 'expo-odk-collect';
 import type { OdkForm, OdkInstance } from 'expo-odk-collect';
 
-export default function FormsScreen() {
+export function FormsScreen() {
   const { odk } = useOdk();
 
   // Lista de formularios cargados desde ODK Collect
