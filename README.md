@@ -2,7 +2,7 @@
 
 Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intro/) for Android. Provides a type-safe bridge between your React Native / Expo app and the ODK Collect data collection app via Android Intents and ContentProviders.
 
-> **Platform support**: Android only. Web exports are no-ops with console warnings.
+> **Platform support**: Android only.
 
 ---
 
@@ -10,23 +10,14 @@ Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intr
 
 - [Installation](#installation)
 - [Android Setup](#android-setup)
+- [External App Setup](#external-app-setup)
 - [How it works](#how-it-works)
+- [Usage](#usage)
+  - [useOdk hook](#useodk-hook)
+  - [odk client](#odk-client)
 - [Error Handling](#error-handling)
 - [API Reference](#api-reference)
-  - [returnResult](#returnresult)
-  - [getIntentExtra](#getintentextra)
-  - [getIntentExtras](#getintentextras)
-  - [getForms](#getforms)
-  - [startODKCollect](#startodk-collect)
-  - [openOdkForms](#openodkforms)
-  - [getCurrentODKid](#getcurrentodkid)
-  - [startInstanceUploaderList](#startinstanceuploadlist)
-  - [checkIfopenByODKform](#checkifopenbyodkform)
-  - [editODKInstance](#editodkinstance)
-  - [sendODKInstance](#sendodkinstance)
 - [Types](#types)
-- [Constants](#constants)
-- [Migration](#migration)
 - [License](#license)
 
 ---
@@ -43,7 +34,7 @@ Then run prebuild to generate native Android files:
 npx expo prebuild
 ```
 
-> Requires **Expo SDK 51** and an Android device or emulator with **ODK Collect** installed (`org.odk.collect.android`).
+> Requires **Expo SDK 51+** and an Android device or emulator with **ODK Collect** installed (`org.odk.collect.android`).
 
 ---
 
@@ -61,6 +52,91 @@ If for any reason you need to add it manually, include the following inside the 
 
 ---
 
+## External App Setup
+
+For your app to be **launched by ODK Collect** as an external app, you need two things in your `app.json`: a deep link scheme and the right `intentFilters`.
+
+### 1. Configure `app.json`
+
+```json
+{
+  "expo": {
+    "scheme": "my-app",
+    "android": {
+      "launchMode": "singleTask",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            {
+              "scheme": "my-app",
+              "host": "*"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    }
+  }
+}
+```
+
+> **`launchMode: "singleTask"`** — required so Android brings the existing Activity to the foreground instead of creating a new one on top. Without it, you may hit the _"App entry point named main was not registered"_ error when ODK relaunches your app.
+
+> **`host: "*"`** — required on Android API 31+. Without the `host` attribute, the system ignores the `intent-filter` when resolving URIs that include a host component (e.g. `my-app://some-screen`). Using `"*"` matches any host under your scheme.
+
+After editing `app.json`, run prebuild to regenerate the native Android files:
+
+```sh
+npx expo prebuild --platform android
+# or
+npx expo run:android
+```
+
+### 2. Configure the XLSForm
+
+In your XLSForm, use `android.intent.action.VIEW` with `uri_data` to launch your app via deep link. This is the recommended approach because it creates a fresh Android Activity rather than reusing an existing one.
+
+**Single field** (uses the `value` extra):
+
+| type | name | appearance |
+|------|------|------------|
+| text | my_field | `ex:android.intent.action.VIEW(uri_data='my-app://external-app', uuid=${instanceID})` |
+
+**Multiple fields** (uses a `field-list` group):
+
+| type | name | appearance | body::intent |
+|------|------|------------|--------------|
+| begin_group | my_group | field-list | `android.intent.action.VIEW(uri_data='my-app://external-app', uuid=${instanceID})` |
+| text | field_one | | |
+| text | field_two | | |
+| end_group | | | |
+
+> **Note**: for the multi-field group, `body::intent` does **not** use the `ex:` prefix. For the single-field `appearance`, it **does** use `ex:`.
+
+The field names inside the group must match exactly the keys you pass to `odk.returnResult()` in your app:
+
+```tsx
+odk.returnResult({
+  field_one: 'value A',
+  field_two: 'value B',
+});
+```
+
+### 3. Read the extras in your app
+
+When ODK Collect launches your app, it passes the extras you declared in the XLSForm (e.g. `uuid`). Read them with `odk.getIntentExtras()`:
+
+```tsx
+import { odk } from 'expo-odk-collect';
+
+const extras = await odk.getIntentExtras();
+console.log(extras.uuid); // e.g. "uuid:550e8400-..."
+```
+
+---
+
 ## How it works
 
 This module enables your app to act as an **ODK Collect external app** — a pattern where ODK Collect launches your app as part of a form, waits for a result, and resumes the form with the data your app returns.
@@ -69,67 +145,135 @@ The full flow:
 
 1. **ODK Collect opens your app** via `startActivityForResult`. The form can pass field values as Intent extras (e.g. a UUID, a record ID, a status flag).
 
-2. **Your app reads those extras** using `getIntentExtras()` (all fields) or `getIntentExtra(key)` (a single field). This lets you know which record the form is asking about.
+2. **Your app reads those extras** using `odk.getIntentExtras()`. This lets you know which record the form is asking about.
 
 3. **The user interacts** with your app — browses a list, selects a record, fills a local form, etc.
 
-4. **Your app calls `returnResult(data)`**. This calls `setResult(RESULT_OK)` on the Android Activity, packs `data` as Intent extras, and calls `finish()`. ODK Collect receives the result and continues the form with the returned values.
+4. **Your app calls `odk.returnResult(data)`**. This calls `setResult(RESULT_OK)` on the Android Activity, packs `data` as Intent extras, and calls `finish()`. ODK Collect receives the result and continues the form with the returned values.
 
-**Full example:**
+---
+
+## Usage
+
+### `useOdk` hook
+
+The recommended way to use the module. Returns the `odk` client and reactive state for results and errors.
 
 ```tsx
-import { getIntentExtras, getIntentExtra, returnResult } from 'expo-odk-collect';
+import { useOdk } from 'expo-odk-collect';
 
-// 1. Read what the form sent
-const extras = getIntentExtras();
-// → { uuid: "abc-123", record_type: "survey", record_id: "42", ... }
+function MyScreen() {
+  const { odk, result, error } = useOdk();
 
-// 2. Read a specific field
-const recordId = getIntentExtra('record_id'); // "42"
+  // result → last OdkActivityResult (from pickForm, pickInstance, editInstance)
+  // error  → last OdkErrorPayload from the native module
+}
+```
 
-// 3. Return the result to ODK (closes the app)
-await returnResult(
-  { selected_id: '99', selected_name: 'Site Alpha' },
-  {
-    onBeforeReturn: async (data) => {
-      // Persist to your own API before handing control back to ODK
-      await myApi.save({ ...data, uuid_odk: getIntentExtra('uuid') });
-    },
+### `odk` client
+
+You can also import the `odk` client directly without the hook:
+
+```tsx
+import { odk } from 'expo-odk-collect';
+
+// Check installation
+const installed = await odk.isInstalled();
+
+// Detect if the Activity was opened by ODK Collect
+const openedByOdk = await odk.isOpenedByOdk();
+
+// Open ODK Collect screens
+odk.launch();
+odk.openForms();
+odk.openInstances();
+
+// Pick a form or instance (result arrives via onResult callback)
+odk.pickForm();
+odk.pickInstance();
+
+// Edit an existing instance
+odk.editInstance('42');
+
+// Query data
+const forms     = await odk.getForms();     // OdkForm[]
+const instances = await odk.getInstances(); // OdkInstance[]
+
+// Read Intent extras (when opened by ODK Collect)
+const extras = await odk.getIntentExtras(); // Record<string, string>
+
+// Return result to ODK and close the app
+odk.returnResult({ field_one: 'value', field_two: 'other' });
+
+// Subscribe to events
+const sub = odk.onResult((result) => {
+  console.log(result.requestCode, result.resultCode, result.uri);
+});
+sub.remove(); // cleanup
+```
+
+**Full external app example:**
+
+```tsx
+import { useEffect, useState } from 'react';
+import { Button } from 'react-native';
+import { useOdk } from 'expo-odk-collect';
+
+export default function ExternalAppScreen() {
+  const { odk } = useOdk();
+  const [uuid, setUuid] = useState<string | null>(null);
+  const [openedByOdk, setOpenedByOdk] = useState(false);
+
+  useEffect(() => {
+    odk.isOpenedByOdk().then(setOpenedByOdk);
+    odk.getIntentExtras().then((extras) => {
+      const raw = extras['uuid'];
+      if (raw) setUuid(raw.includes(':') ? raw.split(':')[1] : raw);
+    });
+  }, []);
+
+  function handleReturn() {
+    if (!openedByOdk) return; // guard: only call when opened by ODK
+    odk.returnResult({
+      selected_id: '99',
+      selected_name: 'Site Alpha',
+    });
   }
-);
+
+  return <Button title="Enviar a ODK" onPress={handleReturn} />;
+}
 ```
 
 ---
 
 ## Error Handling
 
-The module emits an `onError` event (instead of throwing) for runtime failures. Listen for it using `useEvent` from `expo-modules-core`:
+The module emits an `onError` event (instead of throwing) for runtime failures. Listen to it via the `useOdk` hook or subscribing directly:
 
 ```tsx
-import { useEvent } from 'expo-modules-core';
-import { OdkCollectModule } from 'expo-odk-collect';
-import type { OdkErrorPayload } from 'expo-odk-collect';
+import { useEffect } from 'react';
+import { Alert } from 'react-native';
+import { useOdk } from 'expo-odk-collect';
 
-export function useOdkErrors() {
-  useEvent(OdkCollectModule, 'onError', (event: OdkErrorPayload) => {
-    console.error(`[ODK] ${event.code}: ${event.message}`);
+function useOdkErrors() {
+  const { error } = useOdk();
 
-    switch (event.code) {
-      case 'ODK_NOT_INSTALLED':
-        Alert.alert(
-          'ODK Collect not found',
-          'Please install ODK Collect to use this feature.'
-        );
-        break;
-      case 'ACTIVITY_NOT_AVAILABLE':
-        Alert.alert('Error', 'Could not open ODK Collect screen.');
-        break;
-      case 'FORMS_QUERY_FAILED':
-        Alert.alert('Error', 'Could not read forms from ODK Collect.');
-        break;
-    }
-  });
+  useEffect(() => {
+    if (!error) return;
+    Alert.alert(`Error ODK [${error.code}]`, error.message);
+  }, [error]);
 }
+```
+
+Or directly with the `odk` client:
+
+```tsx
+import { odk } from 'expo-odk-collect';
+
+const sub = odk.onError((event) => {
+  console.error(`[ODK] ${event.code}: ${event.message}`);
+});
+// sub.remove() to stop listening
 ```
 
 ### Error Codes
@@ -137,270 +281,177 @@ export function useOdkErrors() {
 | Code | When it fires |
 |------|---------------|
 | `ODK_NOT_INSTALLED` | ODK Collect is not installed on the device |
-| `ACTIVITY_NOT_AVAILABLE` | The requested ODK Collect screen could not be opened |
-| `FORMS_QUERY_FAILED` | The ContentProvider query for forms failed |
+| `ACTIVITY_NOT_FOUND` | The requested ODK Collect screen could not be opened |
+| `QUERY_FAILED` | The ContentProvider query failed |
+| `INVALID_INTENT` | The Intent could not be resolved |
+| `UNKNOWN_ERROR` | Unexpected native error |
 
 ---
 
 ## API Reference
 
-### `returnResult`
+### `odk.isInstalled()`
 
-> **Android only.**
-
-Sends data back to the ODK Collect form that opened your app. Optionally runs an async callback **before** returning data to ODK — use it to persist records to your own API.
-
-Internally calls `setResult(RESULT_OK)` with `data` packed as Intent extras, then calls `finish()`.
+Returns `Promise<boolean>` — `true` if ODK Collect is installed.
 
 ```ts
-returnResult<TData extends Record<string, unknown>>(
-  data: TData,
-  options?: ReturnResultOptions<TData>
-): Promise<void>
+const installed = await odk.isInstalled();
 ```
 
-**Parameters**
+---
 
-| Param | Type | Description |
-|-------|------|-------------|
-| `data` | `TData` | Key-value object to send back to the ODK form |
-| `options.onBeforeReturn` | `(data: TData) => Promise<void>` | Optional async callback executed before the result is sent |
+### `odk.launch()`
 
-**Example — basic**
+Opens the ODK Collect main screen.
 
-```tsx
-import { returnResult } from 'expo-odk-collect';
-
-await returnResult({ record_id: '42', record_name: 'Survey North' });
+```ts
+odk.launch();
 ```
 
-**Example — with pre-sync callback**
+---
 
-```tsx
-import { returnResult, getIntentExtra } from 'expo-odk-collect';
+### `odk.isOpenedByOdk()`
 
-await returnResult(formData, {
-  onBeforeReturn: async (data) => {
-    const uuid = getIntentExtra('uuid'); // field sent by the ODK form
-    if (uuid) {
-      await myApi.createRecord({ ...data, uuid_odk: uuid });
-    }
-  },
+Returns `Promise<boolean>` — `true` if the current Activity was opened by ODK Collect (detected via `Activity.referrer`). Use this before calling `odk.returnResult()` to confirm the app is running in the expected context.
+
+```ts
+const openedByOdk = await odk.isOpenedByOdk();
+
+if (openedByOdk) {
+  odk.returnResult({ selected_id: '42' });
+}
+```
+
+> **Note**: `Activity.referrer` is only populated when the Activity is started via `startActivityForResult`. If the user opened your app from the launcher or a deeplink, this returns `false`.
+
+---
+
+### `odk.openForms()`
+
+Opens the ODK Collect form list screen.
+
+```ts
+odk.openForms();
+```
+
+---
+
+### `odk.openInstances()`
+
+Opens the ODK Collect instance (uploader) list screen.
+
+```ts
+odk.openInstances();
+```
+
+---
+
+### `odk.pickForm()`
+
+Starts an `ACTION_PICK` intent for forms. The selected form URI is returned via the `onActivityResult` event (`requestCode = 2001`).
+
+```ts
+odk.pickForm();
+odk.onResult((result) => {
+  if (result.requestCode === 2001) {
+    console.log('Selected form URI:', result.uri);
+  }
 });
 ```
 
 ---
 
-### `getIntentExtra`
+### `odk.pickInstance()`
 
-> **Android only.**
-
-Reads a single field from the Intent extras of the current Activity. Returns the value as a string, or `null` if the key is not present.
-
-Use this when ODK Collect passes specific form fields to your app when launching it.
+Starts an `ACTION_PICK` intent for instances. The selected instance URI is returned via the `onActivityResult` event (`requestCode = 2002`).
 
 ```ts
-getIntentExtra(key: string): string | null
-```
-
-**Parameters**
-
-| Param | Type | Description |
-|-------|------|-------------|
-| `key` | `string` | The Intent extra key to read |
-
-**Example**
-
-```tsx
-import { getIntentExtra } from 'expo-odk-collect';
-
-const recordId = getIntentExtra('record_id'); // "42" or null
-const uuid     = getIntentExtra('uuid');       // "abc-123" or null
+odk.pickInstance();
 ```
 
 ---
 
-### `getIntentExtras`
+### `odk.editInstance(instanceId)`
 
-> **Android only.**
-
-Reads **all** Intent extras from the current Activity as a flat key-value object. Useful for debugging or when you don't know in advance which fields the form will send.
+Opens ODK Collect to edit the instance with the given ID (`requestCode = 2003`).
 
 ```ts
-getIntentExtras(): Record<string, string>
-```
-
-**Example**
-
-```tsx
-import { getIntentExtras } from 'expo-odk-collect';
-
-const extras = getIntentExtras();
-// → { uuid: "abc-123", record_type: "survey", record_id: "42" }
-
-console.log(Object.keys(extras)); // see all fields ODK sent
+odk.editInstance('42');
 ```
 
 ---
 
-### `getForms`
+### `odk.getForms()`
 
-Returns the list of ODK Collect form instances by querying the ODK ContentProvider.
+Queries the ODK ContentProvider and returns all available forms.
 
 ```ts
-getForms(): OdkFormInstance[]
-```
-
-Emits `onError` with code `ODK_NOT_INSTALLED` if ODK Collect is not present, or `FORMS_QUERY_FAILED` if the query fails.
-
-**Example**
-
-```tsx
-import { getForms } from 'expo-odk-collect';
-import type { OdkFormInstance } from 'expo-odk-collect';
-
-const forms: OdkFormInstance[] = getForms();
-forms.forEach(f => console.log(f.displayName, f.status));
+const forms: OdkForm[] = await odk.getForms();
+forms.forEach(f => console.log(f.displayName, f.jrFormId));
 ```
 
 ---
 
-### `startODKCollect`
+### `odk.getInstances()`
 
-Opens the ODK Collect main screen.
+Queries the ODK ContentProvider and returns all stored instances.
 
 ```ts
-startODKCollect(): void
-```
-
-**Example**
-
-```tsx
-import { startODKCollect } from 'expo-odk-collect';
-
-<Button title="Open ODK Collect" onPress={startODKCollect} />
+const instances: OdkInstance[] = await odk.getInstances();
+instances.forEach(i => console.log(i.displayName, i.status));
 ```
 
 ---
 
-### `openOdkForms`
+### `odk.getIntentExtras()`
 
-Opens the ODK Collect form list screen (where users can start filling a form).
+Returns all Intent extras from the current Activity as a flat string map. Use this when ODK Collect opens your app to read the fields the form passed.
 
 ```ts
-openOdkForms(): void
-```
+const extras: Record<string, string> = await odk.getIntentExtras();
+// → { uuid: "uuid:abc-123", record_type: "survey", record_id: "42" }
 
-**Example**
-
-```tsx
-import { openOdkForms } from 'expo-odk-collect';
-
-<Button title="Browse Forms" onPress={openOdkForms} />
+const uuid = extras['uuid'];
 ```
 
 ---
 
-### `getCurrentODKid`
+### `odk.returnResult(data)`
 
-Reads the ODK instance UUID from the current Android Activity's intent. Returns `""` if there is no UUID in the intent (i.e. the app was not opened by ODK Collect with a form context).
-
-```ts
-getCurrentODKid(): string  // e.g. "uuid:550e8400-e29b-41d4-a716-446655440000"
-```
-
-**Example**
-
-```tsx
-import { getCurrentODKid } from 'expo-odk-collect';
-
-const rawId = getCurrentODKid();          // "uuid:550e8400-..." or ""
-const uuid = rawId.split(':')[1] ?? null; // "550e8400-..." or null
-```
-
-> **Tip**: always guard against the empty string before splitting.
-
----
-
-### `startInstanceUploaderList`
-
-Opens the ODK Collect instance uploader screen, where users can review and manually upload completed forms.
+Sends data back to the ODK Collect form that opened your app and closes the Activity. Must be called from an Activity opened by ODK Collect.
 
 ```ts
-startInstanceUploaderList(): void
-```
-
-**Example**
-
-```tsx
-import { startInstanceUploaderList } from 'expo-odk-collect';
-
-<Button title="Upload Forms" onPress={startInstanceUploaderList} />
+odk.returnResult({
+  selected_id: '99',
+  selected_name: 'Site Alpha',
+});
 ```
 
 ---
 
-### `checkIfopenByODKform`
+### `odk.onResult(callback)`
 
-Returns `true` if the current Activity was opened by ODK Collect (i.e. the Android referrer matches `android-app://org.odk.collect.android`).
-
-Use this to conditionally show or hide UI based on whether the app is acting as an ODK external app.
+Subscribes to activity results (from `pickForm`, `pickInstance`, `editInstance`). Returns a subscription with a `remove()` method.
 
 ```ts
-checkIfopenByODKform(): boolean
-```
+const sub = odk.onResult((result: OdkActivityResult) => {
+  console.log(result.requestCode, result.resultCode, result.uri);
+});
 
-**Example**
-
-```tsx
-import { checkIfopenByODKform } from 'expo-odk-collect';
-
-const isOdkContext = checkIfopenByODKform();
-
-if (isOdkContext) {
-  // Show ODK-specific UI (record selector, form data, etc.)
-} else {
-  // Show normal app UI
-}
+// Cleanup:
+sub.remove();
 ```
 
 ---
 
-### `editODKInstance`
+### `odk.onError(callback)`
 
-Opens ODK Collect to edit a specific form instance by its ID.
-
-```ts
-editODKInstance(instanceId: string): void
-```
-
-**Example**
-
-```tsx
-import { editODKInstance } from 'expo-odk-collect';
-
-editODKInstance('550e8400-e29b-41d4-a716-446655440000');
-```
-
----
-
-### `sendODKInstance`
-
-Triggers an upload of a specific form instance to the given ODK server URL.
+Subscribes to errors emitted by the native module. Returns a subscription with a `remove()` method.
 
 ```ts
-sendODKInstance(instanceId: string, serverUrl: string): void
-```
-
-**Example**
-
-```tsx
-import { sendODKInstance } from 'expo-odk-collect';
-
-sendODKInstance(
-  '550e8400-e29b-41d4-a716-446655440000',
-  'https://my-odk-server.example.com'
-);
+const sub = odk.onError((error: OdkErrorPayload) => {
+  console.error(error.code, error.message);
+});
 ```
 
 ---
@@ -409,109 +460,88 @@ sendODKInstance(
 
 ```ts
 import type {
-  OdkFormInstance,
+  OdkForm,
+  OdkInstance,
+  OdkInstanceStatus,
+  OdkActivityResult,
   OdkErrorPayload,
   OdkErrorCode,
-  OdkCollectConfig,
-  ReturnResultOptions,
+  OdkSubscription,
+  OdkIntentExtras,
+  OdkModuleEvents,
 } from 'expo-odk-collect';
 ```
 
-### `OdkFormInstance`
-
-Represents a single ODK Collect form instance returned by `getForms()`.
+### `OdkForm`
 
 ```ts
-type OdkFormInstance = {
-  _id: string;           // Internal ContentProvider row ID
-  displayName: string;   // Human-readable form name
-  jrFormId: string;      // JavaRosa form ID
-  jrVersion: string;     // Form version string
-  status: string;        // e.g. "incomplete", "complete"
-  date: string;          // Last modified date (ms since epoch as string)
-  deletedDate: string;   // Deletion date if soft-deleted, otherwise ""
+type OdkForm = {
+  id: string;           // Internal ContentProvider row ID
+  displayName: string;  // Human-readable form name
+  jrFormId: string;     // JavaRosa form ID
+  jrVersion?: string;   // Form version string
+};
+```
+
+### `OdkInstance`
+
+```ts
+type OdkInstance = {
+  id: string;
+  instanceId: string;    // Same as id — semantic alias
+  displayName: string;
+  jrFormId: string;
+  jrVersion?: string;
+  status: OdkInstanceStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
+};
+
+type OdkInstanceStatus =
+  | 'incomplete'
+  | 'complete'
+  | 'submitted'
+  | 'submissionFailed'
+  | 'unknown';
+```
+
+### `OdkActivityResult`
+
+Event payload from `pickForm`, `pickInstance`, and `editInstance`.
+
+```ts
+type OdkActivityResult = {
+  requestCode: number;  // 2001=pickForm, 2002=pickInstance, 2003=editInstance
+  resultCode: number;   // Android Activity.RESULT_OK (-1) or RESULT_CANCELED (0)
+  uri?: string;         // URI of the selected item (if any)
 };
 ```
 
 ### `OdkErrorPayload`
 
-Event payload emitted via the `onError` event.
-
 ```ts
 type OdkErrorPayload = {
   code: OdkErrorCode;
   message: string;
-  details?: string;   // Optional extra diagnostic info
+  details?: string;
 };
 
 type OdkErrorCode =
   | 'ODK_NOT_INSTALLED'
-  | 'ACTIVITY_NOT_AVAILABLE'
-  | 'FORMS_QUERY_FAILED';
+  | 'ACTIVITY_NOT_FOUND'
+  | 'QUERY_FAILED'
+  | 'INVALID_INTENT'
+  | 'UNKNOWN_ERROR';
 ```
 
-### `ReturnResultOptions<TData>`
-
-Options for `returnResult`.
+### `OdkSubscription`
 
 ```ts
-type ReturnResultOptions<TData extends Record<string, unknown> = Record<string, unknown>> = {
-  onBeforeReturn?: (data: TData) => Promise<void>;
+type OdkSubscription = {
+  remove: () => void;
 };
 ```
-
-### `OdkCollectConfig` *(future use)*
-
-Configuration type intended for future use by consumers. Not yet consumed by the module itself.
-
-```ts
-type OdkCollectConfig = {
-  odkPackageId?: string;  // Default: 'org.odk.collect.android'
-  serverUrl?: string;
-  messages?: {
-    odkNotFound?: string;
-    genericError?: string;
-    odkAccessError?: string;
-  };
-};
-```
-
----
-
-## Constants
-
-```ts
-import { ODK_REFERRER } from 'expo-odk-collect';
-
-// ODK_REFERRER = 'android-app://org.odk.collect.android'
-```
-
-Used internally by `checkIfopenByODKform()`. Export it in case your app needs to compare referrers in custom logic.
-
----
-
-## Migration
-
-### From v1
-
-If you were using `getCurrentODKid()` to read the ODK UUID, switch to `getIntentExtra` — it gives you direct access to any field the form sends, not just the UUID:
-
-```ts
-// Before (v1) — only UUID, via a raw string parse
-import { getCurrentODKid } from 'expo-odk-collect';
-
-const rawId = getCurrentODKid();    // "uuid:abc-123"
-const uuid  = rawId.split(':')[1];  // "abc-123"
-
-// After (v2) — any Intent extra, by name
-import { getIntentExtra, getIntentExtras } from 'expo-odk-collect';
-
-const uuid      = getIntentExtra('uuid');      // "abc-123"
-const recordId  = getIntentExtra('record_id'); // "42"
-const allExtras = getIntentExtras();           // { uuid: "abc-123", record_id: "42", ... }
-```
-
-> `getCurrentODKid()` still works — it now delegates to `getIntentExtra('uuid')` internally.
 
 ---
 

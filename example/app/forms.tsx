@@ -1,13 +1,13 @@
 /**
- * forms.tsx — Pantalla de lista de formularios ODK
+ * forms.tsx — Pantalla de lista de formularios e instancias ODK
  *
- * Demuestra cómo obtener, listar y gestionar instancias de formularios
+ * Demuestra cómo obtener, listar y gestionar formularios e instancias
  * almacenadas en ODK Collect usando el módulo expo-odk-collect.
  *
  * Funciones demostradas:
- *  - getForms()           → consulta el ContentProvider de ODK y retorna las instancias
- *  - editODKInstance(id)  → abre ODK Collect para editar una instancia específica
- *  - sendODKInstance(id, serverUrl) → envía una instancia al servidor ODK configurado
+ *  - odk.getForms()         → consulta el ContentProvider de ODK y retorna los formularios
+ *  - odk.getInstances()     → consulta el ContentProvider y retorna las instancias
+ *  - odk.editInstance(id)   → abre ODK Collect para editar una instancia específica
  *
  * ¿Qué es una "instancia"?
  * En ODK, cada vez que un usuario llena un formulario, se crea una "instancia":
@@ -15,137 +15,167 @@
  * en estado "incomplete" (incompleta), "complete" (lista para enviar) o "submitted"
  * (ya enviada al servidor).
  *
+ * ¿Qué es un "formulario"?
+ * Los formularios son las plantillas (XLSForms) disponibles en ODK Collect.
+ * No contienen datos ingresados — son la definición del formulario.
+ *
  * Requisitos:
  *  - ODK Collect instalado en el dispositivo Android
- *  - Al menos un formulario iniciado (aunque sea incompleto) en ODK Collect
- *  - El servidor configurado en SERVER_URL debe ser una instancia de ODK Central o KoboToolbox
+ *  - Al menos un formulario descargado o instancia iniciada en ODK Collect
  */
 
 import { View, Text, StyleSheet, FlatList, Button, Alert, ActivityIndicator } from 'react-native';
 import { useState } from 'react';
-import { getForms, editODKInstance, sendODKInstance } from 'expo-odk-collect';
-import type { OdkFormInstance } from 'expo-odk-collect';
-
-/**
- * URL del servidor ODK al que se enviarán las instancias.
- * Reemplazá este valor con la URL real de tu instancia de ODK Central o KoboToolbox.
- *
- * Ejemplo ODK Central: 'https://central.tudominio.com'
- * Ejemplo KoboToolbox: 'https://kf.kobo.nuup.org'
- */
-const SERVER_URL = 'https://kf.kobo.nuup.org';
+import { useOdk } from 'expo-odk-collect';
+import type { OdkForm, OdkInstance } from 'expo-odk-collect';
 
 export default function FormsScreen() {
+  const { odk } = useOdk();
+
+  // Lista de formularios cargados desde ODK Collect
+  const [forms, setForms] = useState<OdkForm[]>([]);
+
   // Lista de instancias cargadas desde ODK Collect
-  const [forms, setForms] = useState<OdkFormInstance[]>([]);
+  const [instances, setInstances] = useState<OdkInstance[]>([]);
 
   // Estado de carga mientras se consulta el ContentProvider
-  const [loading, setLoading] = useState(false);
+  const [loadingForms, setLoadingForms] = useState(false);
+  const [loadingInstances, setLoadingInstances] = useState(false);
 
   /**
-   * getForms()
-   * Consulta el ContentProvider de ODK Collect y retorna todas las instancias
-   * de formularios almacenadas en el dispositivo.
+   * odk.getForms()
+   * Consulta el ContentProvider de ODK Collect (content://...odk.forms/forms)
+   * y retorna todos los formularios disponibles en el dispositivo.
    *
-   * Es una función síncrona — no usa async/await.
-   * Si ODK Collect no está instalado, emite `onError` con código 'ODK_NOT_INSTALLED'.
-   * Si la consulta falla por otro motivo, emite 'FORMS_QUERY_FAILED'.
-   * Ambos errores se manejan globalmente en _layout.tsx.
-   *
-   * El objeto OdkFormInstance tiene estos campos:
-   *   _id          → ID interno del ContentProvider (fila en la BD de ODK)
-   *   displayName  → nombre legible del formulario
-   *   jrFormId     → ID JavaRosa del formulario (definido en el XLSForm)
-   *   jrVersion    → versión del formulario
-   *   status       → "incomplete" | "complete" | "submitted" | etc.
-   *   date         → timestamp de última modificación (milisegundos como string)
-   *   deletedDate  → timestamp de eliminación si fue borrado, "" si no
+   * Cada OdkForm tiene:
+   *   id          → ID interno del ContentProvider
+   *   displayName → nombre legible del formulario
+   *   jrFormId    → ID JavaRosa (definido en el XLSForm)
+   *   jrVersion   → versión del formulario
    */
-  function handleLoadForms() {
-    setLoading(true);
+  async function handleLoadForms() {
+    setLoadingForms(true);
     try {
-      const result = getForms();
+      const result = await odk.getForms();
       setForms(result);
+      if (result.length === 0) {
+        Alert.alert('Sin formularios', 'No se encontraron formularios en ODK Collect.');
+      }
     } finally {
-      setLoading(false);
+      setLoadingForms(false);
     }
   }
 
   /**
-   * editODKInstance(id)
-   * Abre ODK Collect directamente en la pantalla de edición de la instancia indicada.
-   * Usa el _id interno del ContentProvider (no el jrFormId ni el UUID del formulario).
+   * odk.getInstances()
+   * Consulta el ContentProvider de ODK Collect (content://...odk.instances/instances)
+   * y retorna todas las instancias (formularios con datos) en el dispositivo.
    *
-   * Caso de uso: el usuario quiere completar un formulario que quedó incompleto.
+   * Cada OdkInstance tiene:
+   *   id          → ID interno del ContentProvider
+   *   instanceId  → mismo que id (alias semántico)
+   *   displayName → nombre legible
+   *   jrFormId    → ID del formulario base
+   *   status      → 'incomplete' | 'complete' | 'submitted' | 'submissionFailed' | 'unknown'
+   *   createdAt   → fecha de creación
    */
-  function handleEdit(form: OdkFormInstance) {
-    editODKInstance(form._id);
+  async function handleLoadInstances() {
+    setLoadingInstances(true);
+    try {
+      const result = await odk.getInstances();
+      setInstances(result);
+      if (result.length === 0) {
+        Alert.alert('Sin instancias', 'No se encontraron instancias en ODK Collect.');
+      }
+    } finally {
+      setLoadingInstances(false);
+    }
   }
 
   /**
-   * sendODKInstance(id, serverUrl)
-   * Dispara el envío de una instancia específica al servidor ODK configurado.
-   * ODK Collect maneja la comunicación con el servidor — esta función solo
-   * indica a ODK qué instancia enviar y a qué URL.
+   * odk.editInstance(id)
+   * Abre ODK Collect directamente en la pantalla de edición de la instancia indicada.
+   * Usa el id interno del ContentProvider.
    *
-   * Pedimos confirmación antes de enviar porque es una acción irreversible
-   * (una vez enviada, la instancia no se puede recuperar localmente).
+   * El resultado (RESULT_OK / RESULT_CANCELED) llega via onActivityResult.
+   * Caso de uso: el usuario quiere completar un formulario que quedó incompleto.
    */
-  function handleSend(form: OdkFormInstance) {
-    Alert.alert(
-      'Enviar instancia',
-      `¿Subir "${form.displayName}" al servidor?\n\nServidor: ${SERVER_URL}`,
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Enviar',
-          onPress: () => sendODKInstance(form._id, SERVER_URL),
-        },
-      ]
-    );
+  function handleEdit(instance: OdkInstance) {
+    odk.editInstance(instance.id);
   }
 
   return (
     <View style={styles.container}>
-      {/* Botón para cargar las instancias desde ODK Collect.
-          La carga es síncrona pero puede tardar si hay muchas instancias. */}
-      <Button title="Cargar formularios de ODK" onPress={handleLoadForms} />
+      {/* ── Formularios ── */}
+      <Text style={styles.sectionTitle}>Formularios</Text>
+      <Button
+        title={loadingForms ? 'Cargando...' : 'Cargar formularios'}
+        onPress={handleLoadForms}
+        disabled={loadingForms}
+      />
+      {loadingForms && <ActivityIndicator style={{ marginTop: 8 }} />}
 
-      {/* Indicador de carga mientras se consulta el ContentProvider */}
-      {loading && <ActivityIndicator style={{ marginTop: 16 }} />}
+      {forms.length > 0 && (
+        <FlatList
+          data={forms}
+          keyExtractor={(item) => item.id}
+          scrollEnabled={false}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>{item.displayName}</Text>
+              <Text style={styles.cardMeta}>
+                Form ID: {item.jrFormId}
+                {item.jrVersion ? ` · v${item.jrVersion}` : ''}
+              </Text>
+            </View>
+          )}
+        />
+      )}
 
-      {/* Mensaje cuando no hay formularios cargados todavía */}
-      {forms.length === 0 && !loading && (
+      {/* ── Instancias ── */}
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Instancias</Text>
+      <Button
+        title={loadingInstances ? 'Cargando...' : 'Cargar instancias'}
+        onPress={handleLoadInstances}
+        disabled={loadingInstances}
+      />
+      {loadingInstances && <ActivityIndicator style={{ marginTop: 8 }} />}
+
+      {instances.length === 0 && !loadingInstances && (
         <Text style={styles.empty}>
-          No hay formularios cargados.{'\n'}
-          Tocá "Cargar formularios de ODK" para comenzar.
+          No hay instancias cargadas.{'\n'}
+          Tocá "Cargar instancias" para comenzar.
         </Text>
       )}
 
-      {/* Lista de instancias con acciones por item */}
       <FlatList
-        data={forms}
-        keyExtractor={(item) => item._id}
+        data={instances}
+        keyExtractor={(item) => item.id}
+        scrollEnabled={false}
         renderItem={({ item }) => (
           <View style={styles.card}>
-            {/* Nombre legible del formulario */}
+            {/* Nombre legible de la instancia */}
             <Text style={styles.cardTitle}>{item.displayName}</Text>
 
-            {/* Metadatos del formulario: ID y versión JavaRosa */}
+            {/* Metadatos: formulario base y versión */}
             <Text style={styles.cardMeta}>
-              Form ID: {item.jrFormId} · v{item.jrVersion}
+              Form ID: {item.jrFormId}
+              {item.jrVersion ? ` · v${item.jrVersion}` : ''}
             </Text>
 
-            {/* Estado de la instancia: incomplete / complete / submitted */}
-            <Text style={styles.cardMeta}>Estado: {item.status}</Text>
+            {/* Estado de la instancia */}
+            <Text style={[styles.cardMeta, styles[`status_${item.status}` as keyof typeof styles] ?? {}]}>
+              Estado: {item.status}
+            </Text>
+
+            {item.createdAt && (
+              <Text style={styles.cardMeta}>Creada: {item.createdAt}</Text>
+            )}
 
             {/* Acciones disponibles para esta instancia */}
             <View style={styles.cardActions}>
               {/* Editar → abre ODK Collect en la pantalla de edición */}
               <Button title="Editar" onPress={() => handleEdit(item)} />
-
-              {/* Enviar → confirma y sube al servidor ODK */}
-              <Button title="Enviar" onPress={() => handleSend(item)} />
             </View>
           </View>
         )}
@@ -156,6 +186,12 @@ export default function FormsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, padding: 16 },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#555',
+    marginBottom: 8,
+  },
   empty: {
     textAlign: 'center',
     marginTop: 32,
@@ -172,4 +208,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 16, fontWeight: '600' },
   cardMeta: { fontSize: 13, color: '#555', marginTop: 2 },
   cardActions: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  // Status colors
+  status_incomplete: { color: '#e67e22' },
+  status_complete: { color: '#27ae60' },
+  status_submitted: { color: '#2980b9' },
+  status_submissionFailed: { color: '#e74c3c' },
+  status_unknown: { color: '#95a5a6' },
 });

@@ -1,18 +1,31 @@
 import { NativeModule, requireNativeModule } from 'expo';
-import { OdkModuleEvents, OdkFormInstance } from './ExpoOdkCollect.types';
+import { OdkModuleEvents } from './ExpoOdkCollect.types';
+
+
+
+
 
 declare class OdkCollectModule extends NativeModule<OdkModuleEvents> {
+  isInstalled(): boolean;
+
+  launchCollect(): void;
+
+  isOpenedByOdk(): boolean;
+
+  openFormsList(): void;
+  openInstancesList(): void;
+
+  pickForm(): void;
+  pickInstance(): void;
+
+  editInstance(instanceId: string): void;
+
+  getForms(): Record<string, any>[];
+  getInstances(): Record<string, any>[];
+
+  getIntentExtras(): Record<string, string>;
+
   returnResult(data: Record<string, unknown>): void;
-  getForms(): OdkFormInstance[];
-  openOdkForms(): void;
-  startODKCollect(): void;
-  startInstanceUploaderList(): void;
-  getCurrentODKid(): string;
-  checkIfopenByODKform(): string;
-  getIntentExtra(key: string): string;
-  getIntentExtras(): Record<string, unknown>;
-  editODKInstance(instanceId: string): void;
-  sendODKInstance(instanceId: string, serverUrl: string): void;
 }
 
 export default requireNativeModule<OdkCollectModule>('OdkCollect');

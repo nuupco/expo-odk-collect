@@ -2,6 +2,7 @@
   "expo": {
     "name": "expo-odk-collect-example",
     "slug": "expo-odk-collect-example",
+    "scheme": "expo-odk-collect-example",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -17,13 +18,26 @@
       "bundleIdentifier": "expo.modules.odkcollect.example"
     },
     "android": {
+      "launchMode": "singleTask",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "expo.modules.odkcollect.example"
+      "package": "expo.modules.odkcollect.example",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": false,
+          "data": [
+            { "scheme": "expo-odk-collect-example", "host": "*" },
+            { "scheme": "expo.modules.odkcollect.example", "host": "*" },
+            { "scheme": "exp+expo-odk-collect-example", "host": "*" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

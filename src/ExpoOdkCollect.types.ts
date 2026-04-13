@@ -1,7 +1,11 @@
+// -------- ERRORS --------
+
 export type OdkErrorCode =
   | 'ODK_NOT_INSTALLED'
-  | 'ACTIVITY_NOT_AVAILABLE'
-  | 'FORMS_QUERY_FAILED';
+  | 'ACTIVITY_NOT_FOUND'
+  | 'QUERY_FAILED'
+  | 'INVALID_INTENT'
+  | 'UNKNOWN_ERROR';
 
 export type OdkErrorPayload = {
   code: OdkErrorCode;
@@ -9,35 +13,61 @@ export type OdkErrorPayload = {
   details?: string;
 };
 
-export type OdkFormInstance = {
-  _id: string;
+// -------- BASE --------
+
+export type OdkBaseEntity = {
+  id: string;
   displayName: string;
+};
+
+// -------- FORMS --------
+
+export type OdkForm = OdkBaseEntity & {
   jrFormId: string;
-  jrVersion: string;
-  status: string;
-  date: string;
-  deletedDate: string;
+  jrVersion?: string;
 };
 
-export type OdkCollectConfig = {
-  odkPackageId?: string;
-  serverUrl?: string;
-  messages?: {
-    odkNotFound?: string;
-    genericError?: string;
-    odkAccessError?: string;
-  };
+// -------- INSTANCES --------
+
+export type OdkInstanceStatus =
+  | 'incomplete'
+  | 'complete'
+  | 'submitted'
+  | 'submissionFailed'
+  | 'unknown';
+
+export type OdkInstance = OdkBaseEntity & {
+  instanceId: string;
+  jrFormId: string;
+  jrVersion?: string;
+  status: OdkInstanceStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  deletedAt?: string;
 };
 
-export type ReturnResultOptions<TData extends Record<string, unknown> = Record<string, unknown>> = {
-  onBeforeReturn?: (data: TData) => Promise<void>;
+// -------- ACTIVITY RESULT --------
+
+export type OdkActivityResult = {
+  requestCode: number;
+  resultCode: number;
+  uri?: string;
 };
 
-export type ChangeEventPayload = {
-  value: string;
-};
+// -------- INTENT EXTRAS --------
+
+export type OdkIntentExtras = Record<string, string>;
+
+// -------- MODULE EVENTS --------
 
 export type OdkModuleEvents = {
-  onChange: (params: ChangeEventPayload) => void;
+  onActivityResult: (params: OdkActivityResult) => void;
   onError: (params: OdkErrorPayload) => void;
 };
+
+
+export type OdkSubscription = {
+  remove: () => void;
+};
+
+

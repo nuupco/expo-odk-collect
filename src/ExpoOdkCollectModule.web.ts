@@ -1,5 +1,6 @@
-import { NativeModule, registerWebModule } from 'expo';
-import { OdkModuleEvents, OdkFormInstance } from './ExpoOdkCollect.types';
+import { NativeModule, requireNativeModule } from 'expo';
+import { OdkModuleEvents } from './ExpoOdkCollect.types';
+
 
 const warn = (fn: string) =>
   console.warn(
@@ -7,17 +8,59 @@ const warn = (fn: string) =>
   );
 
 class OdkCollectModule extends NativeModule<OdkModuleEvents> {
-  returnResult(_data: Record<string, unknown>): void { warn('returnResult'); }
-  getForms(): OdkFormInstance[] { warn('getForms'); return []; }
-  openOdkForms(): void { warn('openOdkForms'); }
-  startODKCollect(): void { warn('startODKCollect'); }
-  startInstanceUploaderList(): void { warn('startInstanceUploaderList'); }
-  getCurrentODKid(): string { warn('getCurrentODKid'); return ''; }
-  checkIfopenByODKform(): string { warn('checkIfopenByODKform'); return ''; }
-  getIntentExtra(_key: string): string { warn('getIntentExtra'); return ''; }
-  getIntentExtras(): Record<string, unknown> { warn('getIntentExtras'); return {}; }
-  editODKInstance(_instanceId: string): void { warn('editODKInstance'); }
-  sendODKInstance(_instanceId: string, _serverUrl: string): void { warn('sendODKInstance'); }
+  isInstalled(): boolean {
+    warn('isInstalled');
+    return false;
+  }
+
+  launchCollect(): void {
+    warn('launchCollect');
+  }
+
+  isOpenedByOdk(): boolean {
+    warn('isOpenedByOdk');
+    return false;
+  }
+
+  getForms(): Record<string, any>[] {
+    warn('getForms');
+    return [];
+  }
+
+  getInstances(): Record<string, any>[] {
+    warn('getInstances');
+    return [];
+  }
+
+  openFormsList(): void {
+    warn('openFormsList');
+  }
+
+  openInstancesList(): void {
+    warn('openInstancesList');
+  }
+
+  pickForm(): void {
+    warn('pickForm');
+  }
+
+  pickInstance(): void {
+    warn('pickInstance');
+  }
+
+  editInstance(instanceId: string): void {
+    warn('editInstance');
+  }
+
+  returnResult(data: Record<string, unknown>): void {
+    warn('returnResult');
+  }
+
+  getIntentExtras(): Record<string, string> {
+    warn('getIntentExtras');
+    return {};
+  }
 }
 
-export default registerWebModule(OdkCollectModule, 'OdkCollect');
+
+export default requireNativeModule<OdkCollectModule>('OdkCollect');

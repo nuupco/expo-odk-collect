@@ -7,14 +7,12 @@
  *  1. ODK Collect abre esta app usando startActivityForResult (Android Intent)
  *  2. ODK puede pasar datos al Intent (uuid del formulario, id de parcela, etc.)
  *  3. El usuario interactúa con la app (selecciona una parcela, llena datos, etc.)
- *  4. La app llama a returnResult(data) para devolver los datos a ODK y cerrarse
+ *  4. La app llama a odk.returnResult(data) para devolver los datos a ODK y cerrarse
  *
  *  Funciones demostradas:
- *  - checkIfopenByODKform() → detecta si la app fue abierta por ODK Collect
- *  - getCurrentODKid()      → lee el UUID del Intent (shortcut de getIntentExtra('uuid'))
- *  - getIntentExtras()      → lee TODOS los campos que ODK envió al abrir la app
- *  - getIntentExtra(key)    → lee UN campo específico por nombre
- *  - returnResult(data)     → devuelve datos a ODK y cierra la Activity
+ *  - odk.isInstalled()    → detecta si ODK Collect está instalado
+ *  - odk.getIntentExtras() → lee TODOS los campos que ODK envió al abrir la app
+ *  - odk.returnResult(data) → devuelve datos a ODK y cierra la Activity
  *
  *  Para probar esta pantalla en contexto real:
  *  1. Instalá ODK Collect en tu dispositivo Android
@@ -26,14 +24,8 @@
  */
 
 import { View, Text, StyleSheet, Button, Alert, ScrollView } from 'react-native';
-import { useState } from 'react';
-import {
-  checkIfopenByODKform,
-  getCurrentODKid,
-  getIntentExtra,
-  getIntentExtras,
-  returnResult,
-} from 'expo-odk-collect';
+import { useState, useEffect } from 'react';
+import { useOdk } from 'expo-odk-collect';
 
 /**
  * Tipo de los datos que esta app devuelve a ODK Collect.
@@ -43,9 +35,9 @@ import {
  * Los nombres de los campos deben coincidir con los que espera el formulario ODK.
  */
 type SelectedData = {
-  selected_id: string;
-  selected_name: string;
-  selected_area: string;
+  nombre_parcela: string;
+  uuid_parcela: string;
+  id_parcela: string;
 };
 
 /**
@@ -53,48 +45,73 @@ type SelectedData = {
  * En una app real, esto vendría de una lista, un mapa, una búsqueda, etc.
  */
 const MOCK_SELECTION: SelectedData = {
-  selected_id: 'R-99',
-  selected_name: 'Finca Norte',
-  selected_area: '5.2',
+  nombre_parcela: 'Finca Norte',
+  uuid_parcela: 'abc-123',
+  id_parcela: '42',
 };
 
 export default function ExternalAppScreen() {
+  const { odk } = useOdk();
+
   /**
-   * checkIfopenByODKform()
-   * true  → la app fue lanzada por ODK Collect como parte de un formulario
-   * false → la app se abrió de forma independiente (desde el launcher, por ejemplo)
+   * odk.isInstalled()
+   * Retorna Promise<boolean>:
+   *   true  → ODK Collect está instalado en el dispositivo
+   *   false → ODK Collect no está instalado
    *
    * Usamos esto para mostrar advertencias cuando el usuario prueba la pantalla
    * fuera del contexto ODK.
    */
-  const isOdkContext = checkIfopenByODKform();
+  const [isInstalled, setIsInstalled] = useState<boolean | null>(null);
 
   /**
-   * getCurrentODKid()
-   * Retorna el valor del campo "uuid" del Intent con formato "uuid:<valor>".
-   * Ejemplo: "uuid:550e8400-e29b-41d4-a716-446655440000"
+   * odk.isOpenedByOdk()
+   * Retorna Promise<boolean>:
+   *   true  → la Activity fue abierta por ODK Collect (via Activity.referrer)
+   *   false → la app fue abierta de otra forma (launcher, deeplink, etc.)
    *
-   * Si la app no fue abierta por ODK, retorna "".
-   * Extraemos solo la parte del UUID (sin el prefijo "uuid:") para uso posterior.
+   * Útil para saber si tiene sentido llamar a returnResult().
    */
-  const currentId = getCurrentODKid();
-  const uuid = currentId ? currentId.split(':')[1] ?? null : null;
+  const [openedByOdk, setOpenedByOdk] = useState<boolean | null>(null);
+
+  /**
+   * uuid extraído de los Intent extras enviados por ODK Collect.
+   * ODK normalmente pasa el UUID de la instancia del formulario como el extra "uuid".
+   */
+  const [uuid, setUuid] = useState<string | null>(null);
 
   // Estado para mostrar el resultado de getIntentExtras() en pantalla
-  const [intentExtras, setIntentExtras] = useState<Record<string, unknown> | null>(null);
+  const [intentExtras, setIntentExtras] = useState<Record<string, string> | null>(null);
 
   // Estado para deshabilitar el botón mientras se ejecuta returnResult()
   const [sending, setSending] = useState(false);
 
+  useEffect(() => {
+    // Verificar instalación
+    odk.isInstalled().then(setIsInstalled);
+
+    // Verificar si la app fue abierta por ODK Collect
+    odk.isOpenedByOdk().then(setOpenedByOdk);
+
+    // Leer el UUID del Intent (enviado por ODK al abrir la app)
+    odk.getIntentExtras().then((extras) => {
+      const rawUuid = extras['uuid'];
+      if (rawUuid) {
+        // ODK envía el UUID con formato "uuid:<valor>" — extraemos solo el valor
+        setUuid(rawUuid.includes(':') ? (rawUuid.split(':')[1] ?? rawUuid) : rawUuid);
+      }
+    });
+  }, []);
+
   /**
    * Lee TODOS los extras del Intent de Android y los muestra en pantalla.
    *
-   * getIntentExtras() devuelve un objeto plano { clave: valor } con todos
+   * odk.getIntentExtras() devuelve un objeto plano { clave: valor } con todos
    * los campos que ODK Collect pasó al abrir la app.
    *
    * Ejemplo de lo que podría retornar:
    *   {
-   *     uuid: "abc-123",
+   *     uuid: "uuid:abc-123",
    *     producer_name: "Juan García",
    *     plot_id: "42",
    *     community: "San Marcos"
@@ -103,63 +120,49 @@ export default function ExternalAppScreen() {
    * Esto es útil para debuggear qué campos está enviando el formulario ODK,
    * o para leer datos del contexto sin conocer los nombres de antemano.
    */
-  function handleReadExtras() {
-    const extras = getIntentExtras();
+  async function handleReadExtras() {
+    const extras = await odk.getIntentExtras();
     setIntentExtras(extras);
-  }
-
-  /**
-   * Lee UN campo específico del Intent usando getIntentExtra(key).
-   *
-   * getIntentExtra(key) retorna:
-   *   - string con el valor si el campo existe
-   *   - null si el campo no está en el Intent
-   *
-   * En este ejemplo leemos "uuid", que es el campo más común que ODK envía.
-   * Podés reemplazarlo por cualquier otro campo que tu formulario ODK configure.
-   */
-  function handleReadSingleExtra() {
-    const value = getIntentExtra('uuid');
-    Alert.alert('getIntentExtra("uuid")', value || '(vacío — ODK no pasó este campo)');
   }
 
   /**
    * Envía los datos seleccionados de vuelta a ODK Collect y cierra la app.
    *
-   * returnResult(data, options) hace tres cosas en Kotlin:
-   *   1. Ejecuta options.onBeforeReturn(data) si está definido
-   *      → aquí podés sincronizar con tu API antes de cerrar
-   *   2. Llama a Activity.setResult(RESULT_OK) con data como Intent extras
-   *   3. Llama a Activity.finish() → la app se cierra y ODK recibe los datos
+   * odk.returnResult(data) hace en Kotlin:
+   *   1. Llama a Activity.setResult(RESULT_OK) con data como Intent extras
+   *   2. Llama a Activity.finish() → la app se cierra y ODK recibe los datos
    *
-   * Importante: si la app no fue abierta por ODK (isOdkContext === false),
-   * el módulo emite un error 'ACTIVITY_NOT_AVAILABLE' en vez de cerrar la app.
-   * Ese error se maneja globalmente en _layout.tsx con useEvent.
+   * Importante: si la app no fue abierta por ODK, el módulo emite un error
+   * 'ACTIVITY_NOT_FOUND' o simplemente cierra la Activity sin enviar resultado.
    */
   async function handleReturnResult() {
     setSending(true);
     try {
-      await returnResult(MOCK_SELECTION, {
-        /**
-         * onBeforeReturn se ejecuta ANTES de enviar los datos a ODK.
-         * Usalo para persistir registros en tu propio backend, validar datos,
-         * o cualquier lógica de negocio que deba ocurrir antes del cierre.
-         *
-         * Si onBeforeReturn lanza un error, returnResult lo propaga como
-         * rechazo de la Promise — la app NO se cierra y ODK no recibe datos.
-         *
-         * Ejemplo de uso real:
-         *   await myApi.createRecord({ ...data, uuid_odk: uuid });
-         */
-        onBeforeReturn: async (data) => {
-          console.log('[ExternalApp] onBeforeReturn llamado con:', data, '| uuid ODK:', uuid);
-          Alert.alert(
-            'onBeforeReturn ejecutado',
-            `A punto de enviar:\n  ID: ${data.selected_id}\n  Nombre: ${data.selected_name}\n\nUUID del formulario ODK:\n  ${uuid ?? '(no disponible)'}`
-          );
-        },
-      });
-    } finally {
+      /**
+       * Podés agregar lógica aquí antes de llamar a returnResult:
+       *   - Persistir datos en tu propio backend
+       *   - Validar que los datos estén completos
+       *   - Registrar un log
+       *
+       * Si algo falla antes de llamar a returnResult, la app no se cierra
+       * y ODK no recibe datos — el usuario puede reintentar.
+       */
+      console.log('[ExternalApp] returnResult con:', MOCK_SELECTION, '| uuid ODK:', uuid);
+      Alert.alert(
+        'A punto de enviar a ODK',
+        `nombre_parcela: ${MOCK_SELECTION.nombre_parcela}\nuuid_parcela: ${MOCK_SELECTION.uuid_parcela}\nid_parcela: ${MOCK_SELECTION.id_parcela}\n\nUUID formulario ODK:\n${uuid ?? '(no disponible)'}`,
+        [
+          { text: 'Cancelar', style: 'cancel', onPress: () => setSending(false) },
+          {
+            text: 'Enviar',
+            onPress: () => {
+              odk.returnResult(MOCK_SELECTION);
+              setSending(false);
+            },
+          },
+        ]
+      );
+    } catch (err) {
       setSending(false);
     }
   }
@@ -169,33 +172,49 @@ export default function ExternalAppScreen() {
       <Text style={styles.title}>Modo App Externa</Text>
 
       {/* ──────────────────────────────────────────────
-          SECCIÓN 1: Estado de contexto ODK
-          Indica si la app fue abierta desde un formulario ODK.
-          Verde = contexto ODK activo (flujo externo real)
-          Rojo  = app abierta de forma independiente (solo para demo/debug)
+          SECCIÓN 1: Estado de ODK Collect
+          Indica si ODK Collect está instalado.
+          Verde = instalado y disponible
+          Rojo  = no instalado
           ────────────────────────────────────────────── */}
       <View style={styles.infoCard}>
-        <Text style={styles.label}>¿Abierta por ODK Collect?</Text>
-        <Text style={[styles.value, { color: isOdkContext ? 'green' : 'red' }]}>
-          {isOdkContext
-            ? '✅ Sí — app abierta desde un formulario ODK'
-            : '❌ No — abrila desde ODK Collect para probarlo'}
+        <Text style={styles.label}>¿ODK Collect instalado?</Text>
+        <Text style={[styles.value, { color: isInstalled ? 'green' : isInstalled === false ? 'red' : '#aaa' }]}>
+          {isInstalled === null
+            ? '⏳ verificando...'
+            : isInstalled
+            ? '✅ Sí — ODK Collect disponible'
+            : '❌ No — instalá ODK Collect para usar esta función'}
         </Text>
       </View>
 
       {/* ──────────────────────────────────────────────
-          SECCIÓN 2: UUID del formulario ODK
-          getCurrentODKid() es un shortcut de getIntentExtra('uuid').
+          SECCIÓN 2: ¿Fue abierta por ODK Collect?
+          Usa Activity.referrer para detectar si ODK fue
+          quien lanzó esta Activity. Determina si tiene
+          sentido llamar a returnResult().
+          ────────────────────────────────────────────── */}
+      <View style={styles.infoCard}>
+        <Text style={styles.label}>¿Abierta por ODK Collect?</Text>
+        <Text style={[styles.value, { color: openedByOdk ? 'green' : openedByOdk === false ? '#e67e22' : '#aaa' }]}>
+          {openedByOdk === null
+            ? '⏳ verificando...'
+            : openedByOdk
+            ? '✅ Sí — returnResult() enviará datos a ODK'
+            : '⚠️ No — la app no fue abierta por ODK Collect'}
+        </Text>
+      </View>
+
+      {/* ──────────────────────────────────────────────
+          SECCIÓN 3: UUID del formulario ODK
+          Leído desde los extras del Intent al montar la pantalla.
           Retorna el identificador único de la instancia del formulario.
           ────────────────────────────────────────────── */}
       <View style={styles.infoCard}>
-        <Text style={styles.label}>getCurrentODKid()</Text>
-        <Text style={styles.value}>{currentId || '(vacío — no hay ODK ID)'}</Text>
-        {uuid && (
-          <Text style={styles.uuid}>
-            UUID extraído: {uuid}
-          </Text>
-        )}
+        <Text style={styles.label}>UUID del formulario ODK</Text>
+        <Text style={styles.value}>
+          {uuid ?? '(vacío — la app no fue abierta con contexto ODK)'}
+        </Text>
       </View>
 
       {/* ──────────────────────────────────────────────
@@ -208,10 +227,6 @@ export default function ExternalAppScreen() {
       <Button
         title="getIntentExtras() — Leer todos los campos"
         onPress={handleReadExtras}
-      />
-      <Button
-        title='getIntentExtra("uuid") — Leer campo específico'
-        onPress={handleReadSingleExtra}
       />
 
       {/* Resultado visual de getIntentExtras() */}
@@ -235,7 +250,7 @@ export default function ExternalAppScreen() {
 
       {/* ──────────────────────────────────────────────
           SECCIÓN 4: Devolución de resultado a ODK
-          returnResult(data) empaqueta `data` como extras del Intent,
+          odk.returnResult(data) empaqueta `data` como extras del Intent,
           llama a setResult(RESULT_OK) y luego a finish().
           ODK Collect recibe los datos y continúa el formulario.
           ────────────────────────────────────────────── */}
@@ -243,9 +258,9 @@ export default function ExternalAppScreen() {
 
       <View style={styles.infoCard}>
         <Text style={styles.label}>Datos simulados a devolver:</Text>
-        <Text style={styles.value}>ID: {MOCK_SELECTION.selected_id}</Text>
-        <Text style={styles.value}>Nombre: {MOCK_SELECTION.selected_name}</Text>
-        <Text style={styles.value}>Área: {MOCK_SELECTION.selected_area} ha</Text>
+        <Text style={styles.value}>nombre_parcela: {MOCK_SELECTION.nombre_parcela}</Text>
+        <Text style={styles.value}>uuid_parcela: {MOCK_SELECTION.uuid_parcela}</Text>
+        <Text style={styles.value}>id_parcela: {MOCK_SELECTION.id_parcela}</Text>
       </View>
 
       <Button
@@ -254,12 +269,11 @@ export default function ExternalAppScreen() {
         disabled={sending}
       />
 
-      {/* Advertencia visible cuando la app no está en contexto ODK */}
-      {!isOdkContext && (
+      {/* Advertencia visible cuando ODK Collect no está instalado */}
+      {isInstalled === false && (
         <Text style={styles.hint}>
           ⚠️ returnResult() solo funciona cuando la app fue abierta por ODK Collect
-          como app externa. Si lo llamás fuera de ese contexto, el módulo emite
-          un error 'ACTIVITY_NOT_AVAILABLE'.
+          como app externa. Instalá ODK Collect para usar esta función.
         </Text>
       )}
     </ScrollView>
@@ -283,7 +297,6 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 13, color: '#888', marginBottom: 4 },
   value: { fontSize: 15, fontWeight: '500' },
-  uuid: { fontSize: 13, color: '#555', marginTop: 2 },
   extra: { fontSize: 13, color: '#333', marginTop: 2 },
   extraVal: { fontWeight: '600', color: '#000' },
   hint: { color: '#e67e22', fontSize: 13, marginTop: 4 },
