@@ -574,4 +574,4 @@ This repository includes [agent skills](https://github.com/nuupco/expo-odk-colle
 
 ## License
 
-MIT © [nuup](https://nuup.mx)
+MIT © [nuup](https://nuup.org)
