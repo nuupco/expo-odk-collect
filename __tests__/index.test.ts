@@ -1,142 +1,161 @@
-// Mock del módulo nativo
+const mockAddListener = jest.fn();
+const mockRemove = jest.fn();
+
+jest.mock('expo-modules-core', () => ({
+  EventEmitter: jest.fn().mockImplementation(() => ({
+    addListener: mockAddListener,
+  })),
+}));
+
 jest.mock('../src/ExpoOdkCollectModule', () => ({
   __esModule: true,
   default: {
-    returnResult: jest.fn(),
-    getIntentExtra: jest.fn(() => 'test-value'),
-    getIntentExtras: jest.fn(() => ({ uuid: 'test-uuid', field1: 'value1' })),
+    isInstalled: jest.fn(() => true),
+    launchCollect: jest.fn(),
+    isOpenedByOdk: jest.fn(() => false),
     getForms: jest.fn(() => []),
-    startODKCollect: jest.fn(),
-    openOdkForms: jest.fn(),
-    getCurrentODKid: jest.fn(() => 'uuid:test-uuid-123'),
-    startInstanceUploaderList: jest.fn(),
-    checkIfopenByODKform: jest.fn(() => 'android-app://org.odk.collect.android'),
-    editODKInstance: jest.fn(),
-    sendODKInstance: jest.fn(),
+    getInstances: jest.fn(() => []),
+    openFormsList: jest.fn(),
+    openInstancesList: jest.fn(),
+    pickForm: jest.fn(),
+    pickInstance: jest.fn(),
+    editInstance: jest.fn(),
+    returnResult: jest.fn(),
+    getIntentExtras: jest.fn(() => ({ uuid: 'test-uuid' })),
   },
 }));
 
-import {
-  returnResult,
-  getIntentExtra,
-  getIntentExtras,
-  getCurrentODKid,
-  checkIfopenByODKform,
-  sendODKInstance,
-  ODK_REFERRER,
-} from '../src/index';
-import OdkCollectModule from '../src/ExpoOdkCollectModule';
+import { odk } from '../src/index';
+import OdkNative from '../src/ExpoOdkCollectModule';
 
-// Cast to jest mocks for type-safe assertions
-const mockModule = OdkCollectModule as unknown as {
-  returnResult: jest.Mock;
-  getIntentExtra: jest.Mock;
-  getIntentExtras: jest.Mock;
+const mockNative = OdkNative as unknown as {
+  isInstalled: jest.Mock;
+  launchCollect: jest.Mock;
+  isOpenedByOdk: jest.Mock;
   getForms: jest.Mock;
-  startODKCollect: jest.Mock;
-  openOdkForms: jest.Mock;
-  getCurrentODKid: jest.Mock;
-  startInstanceUploaderList: jest.Mock;
-  checkIfopenByODKform: jest.Mock;
-  editODKInstance: jest.Mock;
-  sendODKInstance: jest.Mock;
+  getInstances: jest.Mock;
+  openFormsList: jest.Mock;
+  openInstancesList: jest.Mock;
+  pickForm: jest.Mock;
+  pickInstance: jest.Mock;
+  editInstance: jest.Mock;
+  returnResult: jest.Mock;
+  getIntentExtras: jest.Mock;
 };
 
-describe('returnResult', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('calls native returnResult without callback', async () => {
-    const data = { key: 'value' };
-    await returnResult(data);
-    expect(mockModule.returnResult).toHaveBeenCalledWith(data);
-  });
-
-  it('calls onBeforeReturn callback before native call', async () => {
-    const data = { key: 'value' };
-    const onBeforeReturn = jest.fn().mockResolvedValue(undefined);
-    await returnResult(data, { onBeforeReturn });
-    expect(onBeforeReturn).toHaveBeenCalledWith(data);
-    expect(mockModule.returnResult).toHaveBeenCalledWith(data);
-    // callback was called BEFORE native
-    const callbackOrder = onBeforeReturn.mock.invocationCallOrder[0];
-    const nativeOrder = mockModule.returnResult.mock.invocationCallOrder[0];
-    expect(callbackOrder).toBeLessThan(nativeOrder);
-  });
-
-  it('propagates callback rejection without calling native', async () => {
-    const data = { key: 'value' };
-    const error = new Error('callback failed');
-    const onBeforeReturn = jest.fn().mockRejectedValue(error);
-    await expect(returnResult(data, { onBeforeReturn })).rejects.toThrow('callback failed');
-    expect(mockModule.returnResult).not.toHaveBeenCalled();
-  });
+beforeEach(() => {
+  jest.clearAllMocks();
+  mockAddListener.mockReturnValue({ remove: mockRemove });
 });
 
-describe('getIntentExtra', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+describe('odk client', () => {
+  it('isInstalled resolves native value', async () => {
+    mockNative.isInstalled.mockReturnValue(true);
+    await expect(odk.isInstalled()).resolves.toBe(true);
+    expect(mockNative.isInstalled).toHaveBeenCalled();
   });
 
-  it('returns the value for an existing key', () => {
-    mockModule.getIntentExtra.mockReturnValue('parcela-123');
-    expect(getIntentExtra('id_parcela')).toBe('parcela-123');
-    expect(mockModule.getIntentExtra).toHaveBeenCalledWith('id_parcela');
+  it('launch delegates to launchCollect', () => {
+    odk.launch();
+    expect(mockNative.launchCollect).toHaveBeenCalled();
   });
 
-  it('returns empty string when key is not present', () => {
-    mockModule.getIntentExtra.mockReturnValue('');
-    expect(getIntentExtra('nonexistent')).toBe('');
-  });
-});
-
-describe('getIntentExtras', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
+  it('isOpenedByOdk resolves native value', async () => {
+    mockNative.isOpenedByOdk.mockReturnValue(true);
+    await expect(odk.isOpenedByOdk()).resolves.toBe(true);
+    expect(mockNative.isOpenedByOdk).toHaveBeenCalled();
   });
 
-  it('returns all extras from the intent', () => {
-    const extras = { uuid: 'abc-123', nombre: 'Finca Sur', superficie: '10.5' };
-    mockModule.getIntentExtras.mockReturnValue(extras);
-    expect(getIntentExtras()).toEqual(extras);
-    expect(mockModule.getIntentExtras).toHaveBeenCalled();
+  it('getForms normalizes payload', async () => {
+    mockNative.getForms.mockReturnValue([
+      { _id: 'f1', displayName: 'Form 1', jrFormId: 'form_1', jrVersion: 'v1' },
+      { _id: 'f2', jrFormId: 'form_2' },
+    ]);
+
+    await expect(odk.getForms()).resolves.toEqual([
+      { id: 'f1', displayName: 'Form 1', jrFormId: 'form_1', jrVersion: 'v1' },
+      { id: 'f2', displayName: 'Sin nombre', jrFormId: 'form_2', jrVersion: undefined },
+    ]);
   });
 
-  it('returns empty object when there are no extras', () => {
-    mockModule.getIntentExtras.mockReturnValue({});
-    expect(getIntentExtras()).toEqual({});
-  });
-});
+  it('getInstances normalizes payload', async () => {
+    mockNative.getInstances.mockReturnValue([
+      {
+        _id: 'i1',
+        displayName: 'Instancia 1',
+        jrFormId: 'form_1',
+        status: 'complete',
+        date: '2026-01-01',
+        deletedDate: '2026-01-02',
+      },
+    ]);
 
-describe('getCurrentODKid', () => {
-  it('delegates to getIntentExtra("uuid")', () => {
-    mockModule.getCurrentODKid.mockReturnValue('abc-123');
-    expect(getCurrentODKid()).toBe('abc-123');
-    expect(mockModule.getCurrentODKid).toHaveBeenCalled();
+    await expect(odk.getInstances()).resolves.toEqual([
+      {
+        id: 'i1',
+        instanceId: 'i1',
+        displayName: 'Instancia 1',
+        jrFormId: 'form_1',
+        jrVersion: undefined,
+        status: 'complete',
+        createdAt: '2026-01-01',
+        deletedAt: '2026-01-02',
+      },
+    ]);
   });
 
-  it('returns empty string when uuid is not present', () => {
-    mockModule.getCurrentODKid.mockReturnValue('');
-    expect(getCurrentODKid()).toBe('');
-  });
-});
-
-describe('checkIfopenByODKform', () => {
-  it('returns true when referrer matches ODK_REFERRER', () => {
-    mockModule.checkIfopenByODKform.mockReturnValue(ODK_REFERRER);
-    expect(checkIfopenByODKform()).toBe(true);
+  it('openForms delegates to openFormsList', () => {
+    odk.openForms();
+    expect(mockNative.openFormsList).toHaveBeenCalled();
   });
 
-  it('returns false when referrer does not match', () => {
-    mockModule.checkIfopenByODKform.mockReturnValue('android-app://other.app');
-    expect(checkIfopenByODKform()).toBe(false);
+  it('openInstances delegates to openInstancesList', () => {
+    odk.openInstances();
+    expect(mockNative.openInstancesList).toHaveBeenCalled();
   });
-});
 
-describe('sendODKInstance', () => {
-  it('passes instanceId and serverUrl to native module', () => {
-    sendODKInstance('123', 'https://my.server.org');
-    expect(mockModule.sendODKInstance).toHaveBeenCalledWith('123', 'https://my.server.org');
+  it('pickForm delegates to native', () => {
+    odk.pickForm();
+    expect(mockNative.pickForm).toHaveBeenCalled();
+  });
+
+  it('pickInstance delegates to native', () => {
+    odk.pickInstance();
+    expect(mockNative.pickInstance).toHaveBeenCalled();
+  });
+
+  it('editInstance passes id to native', () => {
+    odk.editInstance('inst-123');
+    expect(mockNative.editInstance).toHaveBeenCalledWith('inst-123');
+  });
+
+  it('returnResult delegates payload to native', () => {
+    const payload = { key: 'value' };
+    odk.returnResult(payload);
+    expect(mockNative.returnResult).toHaveBeenCalledWith(payload);
+  });
+
+  it('getIntentExtras resolves native extras', async () => {
+    const extras = { uuid: 'abc-123', nombre: 'Finca Sur' };
+    mockNative.getIntentExtras.mockReturnValue(extras);
+    await expect(odk.getIntentExtras()).resolves.toEqual(extras);
+  });
+
+  it('onResult subscribes to onActivityResult and returns removable subscription', () => {
+    const callback = jest.fn();
+    const sub = odk.onResult(callback);
+
+    expect(mockAddListener).toHaveBeenCalledWith('onActivityResult', callback);
+    sub.remove();
+    expect(mockRemove).toHaveBeenCalled();
+  });
+
+  it('onError subscribes to onError and returns removable subscription', () => {
+    const callback = jest.fn();
+    const sub = odk.onError(callback);
+
+    expect(mockAddListener).toHaveBeenCalledWith('onError', callback);
+    sub.remove();
+    expect(mockRemove).toHaveBeenCalled();
   });
 });
