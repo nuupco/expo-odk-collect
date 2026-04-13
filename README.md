@@ -18,6 +18,7 @@ Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intr
 - [Error Handling](#error-handling)
 - [API Reference](#api-reference)
 - [Types](#types)
+- [AI Agent Skills](#ai-agent-skills)
 - [License](#license)
 
 ---
@@ -542,6 +543,32 @@ type OdkSubscription = {
   remove: () => void;
 };
 ```
+
+---
+
+## AI Agent Skills
+
+This repository includes [agent skills](https://github.com/nuupco/expo-odk-collect/tree/main/.claude/skills) for AI coding assistants (Claude, Copilot, etc.) that help enforce correct usage patterns automatically.
+
+| Skill | Audience | Trigger |
+|-------|----------|---------|
+| [`expo-odk-collect`](.claude/skills/expo-odk-collect/SKILL.md) | **Contributors** — working on the package itself | Editing `OdkClient`, types, normalizers, native module, or Kotlin code |
+| [`expo-odk-collect-integration`](.claude/skills/expo-odk-collect-integration/SKILL.md) | **Consumers** — integrating the package into an Expo project | Setting up `app.json`, building external-app screens, querying forms/instances |
+
+### What the skills cover
+
+**`expo-odk-collect`** (contributors):
+- File architecture and responsibility of each `src/` file
+- How to add a new `OdkClient` method end-to-end (TypeScript → Kotlin)
+- Normalizer contract for ContentProvider data
+- Error event pattern (never throw, always emit)
+
+**`expo-odk-collect-integration`** (consumers):
+- Installation and required `app.json` config (`launchMode`, `host: "*"`, `scheme`)
+- Full external-app flow with `isOpenedByOdk()` guard and UUID parsing
+- Querying forms and instances, subscribing to activity results
+- XLSForm configuration for single-field and multi-field groups
+- Common mistakes table
 
 ---
 
