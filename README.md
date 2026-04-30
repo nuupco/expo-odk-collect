@@ -6,6 +6,7 @@
 ![npm downloads](https://img.shields.io/npm/dm/@nuup/expo-odk-collect)
 ![GitHub issues](https://img.shields.io/github/issues/nuupco/expo-odk-collect)
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/nuupco/expo-odk-collect)
+
 Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intro/) for Android. Provides a type-safe bridge between your React Native / Expo app and the ODK Collect data collection app via Android Intents and ContentProviders.
 
 > **Platform support**: Android only.
