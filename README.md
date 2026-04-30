@@ -35,7 +35,7 @@ Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intr
 ## Installation
 
 ```sh
-npx expo install expo-odk-collect
+npx expo install @nuup/expo-odk-collect
 ```
 
 Then run prebuild to generate native Android files:
