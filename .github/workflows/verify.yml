@@ -1,5 +1,7 @@
 name: Verify Build
 on:
+  push:
+    branches: [main, dev]
   pull_request:
     branches: [main, dev]
 
@@ -11,5 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm' # Agregado para que instale más rápido
       - run: npm install
+      - run: npm test   # <--- ¡ESTO ES LO MÁS IMPORTANTE!
       - run: npm run build

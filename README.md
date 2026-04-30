@@ -1,5 +1,11 @@
-# expo-odk-collect
+# @nuup/expo-odk-collect
 
+![npm version](https://img.shields.io/npm/v/@nuup/expo-odk-collect?color=blue)
+![license](https://img.shields.io/github/license/nuupco/expo-odk-collect)
+![build status](https://github.com/nuupco/expo-odk-collect/actions/workflows/verify.yml/badge.svg)
+![npm downloads](https://img.shields.io/npm/dm/@nuup/expo-odk-collect)
+![GitHub issues](https://img.shields.io/github/issues/nuupco/expo-odk-collect)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/nuupco/expo-odk-collect)
 Expo module to integrate with [ODK Collect](https://docs.getodk.org/collect-intro/) for Android. Provides a type-safe bridge between your React Native / Expo app and the ODK Collect data collection app via Android Intents and ContentProviders.
 
 > **Platform support**: Android only.
@@ -560,12 +566,14 @@ This repository includes [agent skills](https://github.com/nuupco/expo-odk-colle
 ### What the skills cover
 
 **`expo-odk-collect`** (contributors):
+
 - File architecture and responsibility of each `src/` file
 - How to add a new `OdkClient` method end-to-end (TypeScript → Kotlin)
 - Normalizer contract for ContentProvider data
 - Error event pattern (never throw, always emit)
 
 **`expo-odk-collect-integration`** (consumers):
+
 - Installation and required `app.json` config (`launchMode`, `host: "*"`, `scheme`)
 - Full external-app flow with `isOpenedByOdk()` guard and UUID parsing
 - Querying forms and instances, subscribing to activity results
