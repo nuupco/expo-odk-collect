@@ -22,7 +22,10 @@
     "odk-collect",
     "android"
   ],
-  "repository": "https://github.com/nuupco/expo-odk-collect",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nuupco/expo-odk-collect.git"
+  },
   "bugs": {
     "url": "https://github.com/nuupco/expo-odk-collect/issues"
   },
