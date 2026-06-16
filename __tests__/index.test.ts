@@ -69,7 +69,7 @@ describe('odk client', () => {
   });
 
   it('getForms normalizes payload', async () => {
-    mockNative.getForms.mockReturnValue([
+    mockNative.getForms.mockResolvedValue([
       { _id: 'f1', displayName: 'Form 1', jrFormId: 'form_1', jrVersion: 'v1' },
       { _id: 'f2', jrFormId: 'form_2' },
     ]);
@@ -81,7 +81,7 @@ describe('odk client', () => {
   });
 
   it('getInstances normalizes payload', async () => {
-    mockNative.getInstances.mockReturnValue([
+    mockNative.getInstances.mockResolvedValue([
       {
         _id: 'i1',
         displayName: 'Instancia 1',
