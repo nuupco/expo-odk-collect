@@ -20,6 +20,7 @@ jest.mock('../src/ExpoOdkCollectModule', () => ({
     pickForm: jest.fn(),
     pickInstance: jest.fn(),
     editInstance: jest.fn(),
+    fillForm: jest.fn(),
     returnResult: jest.fn(),
     getIntentExtras: jest.fn(() => ({ uuid: 'test-uuid' })),
   },
@@ -39,6 +40,7 @@ const mockNative = OdkNative as unknown as {
   pickForm: jest.Mock;
   pickInstance: jest.Mock;
   editInstance: jest.Mock;
+  fillForm: jest.Mock;
   returnResult: jest.Mock;
   getIntentExtras: jest.Mock;
 };
@@ -127,6 +129,11 @@ describe('odk client', () => {
   it('editInstance passes id to native', () => {
     odk.editInstance('inst-123');
     expect(mockNative.editInstance).toHaveBeenCalledWith('inst-123');
+  });
+
+  it('fillForm passes id to native', () => {
+    odk.fillForm('form-123');
+    expect(mockNative.fillForm).toHaveBeenCalledWith('form-123');
   });
 
   it('returnResult delegates payload to native', () => {
