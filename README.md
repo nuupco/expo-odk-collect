@@ -393,7 +393,7 @@ odk.editInstance('42');
 
 ### `odk.fillForm(formId)`
 
-Opens ODK Collect to fill a blank form with the given form ID. Use the `id` from `getForms()` (the form's row ID, not its `jrFormId`). The created instance URI is returned via the `onActivityResult` event (`requestCode = 2004`).
+Opens ODK Collect to fill a blank form with the given form ID. Use the `id` from `getForms()` (the form's row ID, not its `jrFormId`). On success, the created instance URI is returned via the `onActivityResult` event (`requestCode = 2004`, `resultCode = RESULT_OK`). If the user backs out without saving, ODK returns `RESULT_CANCELED` and `result.uri` is empty — always check `resultCode` before using the URI.
 
 ```ts
 odk.fillForm('7');
