@@ -59,3 +59,5 @@ skills-lock.json
 
 # npm pack artifacts
 *.tgz
+
+.atl/
