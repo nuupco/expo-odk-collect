@@ -56,3 +56,6 @@ yarn-error.log
 # Expo
 .expo/*
 skills-lock.json
+
+# npm pack artifacts
+*.tgz
