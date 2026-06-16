@@ -29,11 +29,10 @@ src/
 ├── ExpoOdkCollect.hook.ts       # useOdk() hook — reactive wrapper over odk client
 ├── ExpoOdkCollect.normalizer.ts # Raw native data → typed domain objects
 ├── ExpoOdkCollectModule.ts      # Native module bindings (Android)
-├── ExpoOdkCollectModule.web.ts  # Web stub (no-op)
 └── index.ts                     # Public exports
 ```
 
-**Android-only.** The web module exports stubs. Never add iOS code.
+**Android-only.** There is no web fallback — importing on web throws. Never add iOS code.
 
 ---
 
@@ -100,7 +99,7 @@ const sub = odk.onError((event) => {
 // All types live in ExpoOdkCollect.types.ts
 
 OdkForm          → { id, displayName, jrFormId, jrVersion? }
-OdkInstance      → { id, instanceId, displayName, jrFormId, jrVersion?, status, createdAt?, updatedAt?, deletedAt? }
+OdkInstance      → { id, instanceId, displayName, jrFormId, jrVersion?, status, createdAt?, deletedAt? }
 OdkInstanceStatus → 'incomplete' | 'complete' | 'submitted' | 'submissionFailed' | 'unknown'
 OdkActivityResult → { requestCode: number, resultCode: number, uri?: string }
 OdkErrorPayload  → { code: OdkErrorCode, message: string, details?: string }
@@ -116,6 +115,7 @@ OdkSubscription  → { remove: () => void }
 | `2001` | `pickForm` |
 | `2002` | `pickInstance` |
 | `2003` | `editInstance` |
+| `2004` | `fillForm` |
 
 ---
 

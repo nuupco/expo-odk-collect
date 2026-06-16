@@ -175,7 +175,7 @@ import { useOdk } from 'expo-odk-collect';
 function MyScreen() {
   const { odk, result, error } = useOdk();
 
-  // result → last OdkActivityResult (from pickForm, pickInstance, editInstance)
+  // result → last OdkActivityResult (from pickForm, pickInstance, editInstance, fillForm)
   // error  → last OdkErrorPayload from the native module
 }
 ```
@@ -391,6 +391,16 @@ odk.editInstance('42');
 
 ---
 
+### `odk.fillForm(formId)`
+
+Opens ODK Collect to fill a blank form with the given form ID. Use the `id` from `getForms()` (the form's row ID, not its `jrFormId`). The created instance URI is returned via the `onActivityResult` event (`requestCode = 2004`).
+
+```ts
+odk.fillForm('7');
+```
+
+---
+
 ### `odk.getForms()`
 
 Queries the ODK ContentProvider and returns all available forms.
@@ -441,7 +451,7 @@ odk.returnResult({
 
 ### `odk.onResult(callback)`
 
-Subscribes to activity results (from `pickForm`, `pickInstance`, `editInstance`). Returns a subscription with a `remove()` method.
+Subscribes to activity results (from `pickForm`, `pickInstance`, `editInstance`, `fillForm`). Returns a subscription with a `remove()` method.
 
 ```ts
 const sub = odk.onResult((result: OdkActivityResult) => {
@@ -504,7 +514,6 @@ type OdkInstance = {
   jrVersion?: string;
   status: OdkInstanceStatus;
   createdAt?: string;
-  updatedAt?: string;
   deletedAt?: string;
 };
 
@@ -518,11 +527,11 @@ type OdkInstanceStatus =
 
 ### `OdkActivityResult`
 
-Event payload from `pickForm`, `pickInstance`, and `editInstance`.
+Event payload from `pickForm`, `pickInstance`, `editInstance`, and `fillForm`.
 
 ```ts
 type OdkActivityResult = {
-  requestCode: number;  // 2001=pickForm, 2002=pickInstance, 2003=editInstance
+  requestCode: number;  // 2001=pickForm, 2002=pickInstance, 2003=editInstance, 2004=fillForm
   resultCode: number;   // Android Activity.RESULT_OK (-1) or RESULT_CANCELED (0)
   uri?: string;         // URI of the selected item (if any)
 };

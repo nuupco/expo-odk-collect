@@ -1,9 +1,6 @@
 import { NativeModule, requireNativeModule } from 'expo';
+
 import { OdkModuleEvents } from './ExpoOdkCollect.types';
-
-
-
-
 
 declare class OdkCollectModule extends NativeModule<OdkModuleEvents> {
   isInstalled(): boolean;
@@ -20,8 +17,10 @@ declare class OdkCollectModule extends NativeModule<OdkModuleEvents> {
 
   editInstance(instanceId: string): void;
 
-  getForms(): Record<string, any>[];
-  getInstances(): Record<string, any>[];
+  fillForm(formId: string): void;
+
+  getForms(): Promise<Record<string, any>[]>;
+  getInstances(): Promise<Record<string, any>[]>;
 
   getIntentExtras(): Record<string, string>;
 

@@ -12,6 +12,7 @@ import expo.modules.kotlin.exception.CodedException
 const val REQUEST_PICK_FORM = 2001
 const val REQUEST_PICK_INSTANCE = 2002
 const val REQUEST_EDIT_INSTANCE = 2003
+const val REQUEST_FILL_FORM = 2004
 
 class OdkCollectModule : Module() {
 
@@ -61,11 +62,15 @@ class OdkCollectModule : Module() {
             editInstance(instanceId)
         }
 
-        Function("getForms") {
+        Function("fillForm") { formId: String ->
+            fillForm(formId)
+        }
+
+        AsyncFunction("getForms") {
             queryForms()
         }
 
-        Function("getInstances") {
+        AsyncFunction("getInstances") {
             queryInstances()
         }
 
@@ -184,6 +189,18 @@ class OdkCollectModule : Module() {
         }
 
         startIntent(intent, REQUEST_EDIT_INSTANCE)
+    }
+
+    private fun fillForm(formId: String) {
+        val uri = Uri.parse(
+            "content://org.odk.collect.android.provider.odk.forms/forms/$formId"
+        )
+
+        val intent = Intent(Intent.ACTION_EDIT).apply {
+            data = uri
+        }
+
+        startIntent(intent, REQUEST_FILL_FORM)
     }
 
     // -------- CONTENT PROVIDERS --------
