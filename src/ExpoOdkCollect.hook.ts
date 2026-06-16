@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import { odk } from './ExpoOdkCollect.sdk';
 import { OdkActivityResult, OdkErrorPayload } from './ExpoOdkCollect.types';
 
