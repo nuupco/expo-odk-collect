@@ -1,4 +1,5 @@
-import OdkNative from './ExpoOdkCollectModule';
+import { EventEmitter } from 'expo-modules-core';
+
 import { normalizeForm, normalizeInstance } from './ExpoOdkCollect.normalizer';
 import {
   OdkForm,
@@ -8,8 +9,7 @@ import {
   OdkSubscription,
   OdkModuleEvents,
 } from './ExpoOdkCollect.types';
-
-import { EventEmitter } from 'expo-modules-core';
+import OdkNative from './ExpoOdkCollectModule';
 
 const emitter = new EventEmitter<OdkModuleEvents>(OdkNative);
 
@@ -53,6 +53,12 @@ export interface OdkClient {
   editInstance(instanceId: string): void;
 
   /**
+   * Opens ODK Collect to fill a blank form with the given form ID.
+   * The created instance URI is returned via the `onActivityResult` event.
+   */
+  fillForm(formId: string): void;
+
+  /**
    * Returns data to the ODK Collect form that opened this app and closes the
    * Activity. Must be called from an Activity opened by ODK Collect.
    */
@@ -82,12 +88,12 @@ export const odk: OdkClient = {
   },
 
   async getForms() {
-    const raw = OdkNative.getForms();
+    const raw = await OdkNative.getForms();
     return raw.map(normalizeForm);
   },
 
   async getInstances() {
-    const raw = OdkNative.getInstances();
+    const raw = await OdkNative.getInstances();
     return raw.map(normalizeInstance);
   },
 
@@ -109,6 +115,10 @@ export const odk: OdkClient = {
 
   editInstance(instanceId: string) {
     OdkNative.editInstance(instanceId);
+  },
+
+  fillForm(formId: string) {
+    OdkNative.fillForm(formId);
   },
 
   returnResult(data) {
