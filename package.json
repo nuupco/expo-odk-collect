@@ -1,6 +1,6 @@
 {
   "name": "@nuup/expo-odk-collect",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Bridge between Expo and ODK Collect for Android",
   "main": "build/index.js",
   "types": "build/index.d.ts",
