@@ -4,13 +4,13 @@ plugins {
 }
 
 group = 'expo.modules.odkcollect'
-version = '0.1.0'
+version = '1.0.1'
 
 android {
   namespace "expo.modules.odkcollect"
   defaultConfig {
     versionCode 1
-    versionName "0.1.0"
+    versionName "1.0.1"
   }
   lintOptions {
     abortOnError false
