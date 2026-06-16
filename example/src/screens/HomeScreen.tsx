@@ -42,7 +42,7 @@ export function HomeScreen() {
   }, []);
 
   /**
-   * Muestra en un Alert el último resultado de actividad (pickForm, pickInstance, editInstance).
+   * Muestra en un Alert el último resultado de actividad (pickForm, pickInstance, editInstance, fillForm).
    * El hook useOdk() captura automáticamente los eventos onActivityResult del módulo.
    */
   useEffect(() => {

@@ -7,6 +7,7 @@
  * Funciones demostradas:
  *  - odk.getForms()         → consulta el ContentProvider de ODK y retorna los formularios
  *  - odk.getInstances()     → consulta el ContentProvider y retorna las instancias
+ *  - odk.fillForm(id)       → abre ODK Collect para llenar un formulario en blanco
  *  - odk.editInstance(id)   → abre ODK Collect para editar una instancia específica
  *
  * ¿Qué es una "instancia"?
@@ -93,6 +94,20 @@ export function FormsScreen() {
   }
 
   /**
+   * odk.fillForm(id)
+   * Abre ODK Collect para llenar un formulario en blanco (una instancia nueva).
+   * Usa el id interno del ContentProvider (OdkForm.id), no el jrFormId.
+   *
+   * El resultado (RESULT_OK / RESULT_CANCELED) llega via onActivityResult
+   * con requestCode 2004. La URI de la instancia creada viene en result.uri.
+   * Caso de uso: dirigir al usuario directo a un formulario concreto, sin
+   * pasar por la lista completa de ODK (pickForm).
+   */
+  function handleFill(form: OdkForm) {
+    odk.fillForm(form.id);
+  }
+
+  /**
    * odk.editInstance(id)
    * Abre ODK Collect directamente en la pantalla de edición de la instancia indicada.
    * Usa el id interno del ContentProvider.
@@ -127,6 +142,12 @@ export function FormsScreen() {
                 Form ID: {item.jrFormId}
                 {item.jrVersion ? ` · v${item.jrVersion}` : ''}
               </Text>
+
+              {/* Acciones disponibles para este formulario */}
+              <View style={styles.cardActions}>
+                {/* Llenar → abre ODK Collect con un formulario en blanco */}
+                <Button title="Llenar (fillForm)" onPress={() => handleFill(item)} />
+              </View>
             </View>
           )}
         />
