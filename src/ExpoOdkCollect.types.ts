@@ -42,7 +42,6 @@ export type OdkInstance = OdkBaseEntity & {
   jrVersion?: string;
   status: OdkInstanceStatus;
   createdAt?: string;
-  updatedAt?: string;
   deletedAt?: string;
 };
 
@@ -65,9 +64,6 @@ export type OdkModuleEvents = {
   onError: (params: OdkErrorPayload) => void;
 };
 
-
 export type OdkSubscription = {
   remove: () => void;
 };
-
-
